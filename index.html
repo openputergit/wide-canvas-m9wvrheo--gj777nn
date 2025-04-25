@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV to Website Converter</title>
+    <script src="https://unpkg.com/pdf-lib"></script>
+    <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .drag-area {
+            border: 2px dashed #4B5563;
+            transition: all 0.3s ease;
+        }
+        .drag-area.active {
+            border-color: #60A5FA;
+            background-color: #EFF6FF;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">CV to Website Converter</h1>
+            <p class="text-gray-600">Transform your resume into a professional website instantly</p>
+        </header>
+
+        <div class="max-w-2xl mx-auto">
+            <div class="drag-area p-8 rounded-lg text-center cursor-pointer">
+                <i class="bi bi-cloud-upload text-4xl text-gray-600 mb-4"></i>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">Drag & Drop your CV/Resume</h3>
+                <p class="text-gray-500 text-sm mb-4">Supported formats: PDF, DOCX</p>
+                <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx">
+                <button class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition duration-300">
+                    Choose File
+                </button>
+            </div>
+
+            <div id="preview" class="mt-8 hidden">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Preview</h2>
+                <div id="previewContent" class="bg-white p-6 rounded-lg shadow-md">
+                    <!-- Preview content will be inserted here -->
+                </div>
+                <div class="mt-6 text-center">
+                    <button id="generateButton" class="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg transition duration-300">
+                        Generate Website
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dragArea = document.querySelector('.drag-area');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const previewContent = document.getElementById('previewContent');
+        const generateButton = document.getElementById('generateButton');
+
+        // Handle click to upload
+        dragArea.addEventListener('click', () => fileInput.click());
+
+        // Handle drag events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dragArea.addEventListener(eventName, preventDefaults);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dragArea.addEventListener(eventName, () => dragArea.classList.add('active'));
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dragArea.addEventListener(eventName, () => dragArea.classList.remove('active'));
+        });
+
+        // Handle file drop
+        dragArea.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            processFile(file);
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            processFile(file);
+        }
+
+        async function processFile(file) {
+            if (!file) return;
+
+            const extension = file.name.split('.').pop().toLowerCase();
+            
+            if (extension === 'pdf') {
+                // Handle PDF
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const arrayBuffer = e.target.result;
+                        const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                        const pages = pdfDoc.getPages();
+                        const text = await pages[0].getText();
+                        displayPreview(text);
+                    } catch (error) {
+                        console.error('Error processing PDF:', error);
+                        alert('Error processing PDF file');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } else if (extension === 'docx') {
+                // Handle DOCX
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    mammoth.extractRawText({arrayBuffer: e.target.result})
+                        .then(result => {
+                            displayPreview(result.value);
+                        })
+                        .catch(error => {
+                            console.error('Error processing DOCX:', error);
+                            alert('Error processing DOCX file');
+                        });
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('Please upload a PDF or DOCX file');
+            }
+        }
+
+        function displayPreview(content) {
+            preview.classList.remove('hidden');
+            previewContent.innerHTML = `<pre class="whitespace-pre-wrap">${content}</pre>`;
+        }
+
+        generateButton.addEventListener('click', () => {
+            const content = previewContent.textContent;
+            generateWebsite(content);
+        });
+
+        function generateWebsite(content) {
+            // Create a basic template with the content
+            const template = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>My Professional Website</title>
+                    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                </head>
+                <body class="bg-gray-50">
+                    <div class="container mx-auto px-4 py-8">
+                        <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-8">
+                            ${formatContent(content)}
+                        </div>
+                    </div>
+                <script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+                </html>
